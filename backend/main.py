@@ -9,6 +9,11 @@ from api.schema_routes import router as schema_router
 from api.schema_routes import _load_schema
 from api.ai_routes import router as ai_router
 from api.workflow_routes import router as workflow_router
+from api.admin_routes import router as admin_router
+
+from middleware.rate_limit import RateLimiter
+from middleware.security_headers import SecurityHeadersMiddleware
+from middleware.request_logging import RequestLoggingMiddleware
 
 app = FastAPI(
     title="AI SQL Query Assistant — Backend",
@@ -16,7 +21,12 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Allow the Next.js frontend running on port 3000 to call these APIs
+# Security middleware — order matters: rate limit first, then logging, then security headers
+app.add_middleware(RateLimiter)
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+
+# CORS — allow frontend origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001"],
@@ -25,21 +35,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Register API routers
 app.include_router(query_router)
 app.include_router(schema_router)
 app.include_router(ai_router)
 app.include_router(workflow_router)
+app.include_router(admin_router)
 
 
 @app.on_event("startup")
 def on_startup():
-    """
-    On every startup:
-    1. Create the DB schema (all tables)
-    2. Seed with sample data (only if tables are empty)
-    """
     init_db()
-    # Check if tables are already seeded by checking if customers exist
     db = next(get_db())
     from database.models import Customer
     count = db.query(Customer).count()
@@ -55,19 +61,11 @@ def on_startup():
 
 @app.get("/health")
 def health_check():
-    """
-    Health check endpoint.
-    Frontend and load balancers use this to verify the server is up.
-    """
     return {"status": "running"}
 
 
 @app.get("/tables", dependencies=[Depends(get_db)])
 def list_tables(db: Session = Depends(get_db)):
-    """
-    Returns a list of all table names in the connected database.
-    The frontend uses this to build the schema browser sidebar.
-    """
     table_names = get_table_names()
     return {"tables": table_names, "count": len(table_names)}
 

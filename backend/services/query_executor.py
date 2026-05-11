@@ -1,31 +1,18 @@
+import threading
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from database.connection import SessionLocal
 from services.sql_validator import validate_query
+from services.secret_filter import safe_error_message
+
+
+QUERY_TIMEOUT_SECONDS = 5
 
 
 class QueryExecutor:
-    """
-    Executes validated SQL queries against the database.
-    All queries are validated first — this class assumes validation already passed.
-    """
-
     def execute(self, query: str) -> dict:
-        """
-        Validates and executes a SQL query, returning results as a dict.
-
-        Args:
-            query: The SQL query string (should already be validated)
-
-        Returns:
-            A dict with:
-              - success: bool
-              - columns: list[str] (empty on error)
-              - rows: list[list] (empty on error)
-              - count: int (0 on error)
-              - error: str | None (set on failure)
-        """
         is_valid, error = validate_query(query)
         if not is_valid:
             return {
@@ -36,26 +23,42 @@ class QueryExecutor:
                 "error": error,
             }
 
-        db = SessionLocal()
-        try:
-            result = db.execute(text(query))
-            rows = result.fetchall()
+        result_holder: dict = {"data": None, "error": None}
 
-            columns = list(result.keys()) if result.keys() else []
-            rows_data = [[cell for cell in row] for row in rows]
+        def _run_query():
+            db = SessionLocal()
+            try:
+                result = db.execute(text(query))
+                rows = result.fetchall()
+                columns = list(result.keys()) if result.keys() else []
+                rows_data = [[cell for cell in row] for row in rows]
+                result_holder["data"] = {
+                    "columns": columns,
+                    "rows": rows_data,
+                    "count": len(rows_data),
+                }
+            except SQLAlchemyError as e:
+                result_holder["error"] = safe_error_message(e)
+            except Exception as e:
+                result_holder["error"] = safe_error_message(e)
+            finally:
+                db.close()
 
-            return {
-                "success": True,
-                "columns": columns,
-                "rows": rows_data,
-                "count": len(rows_data),
-                "error": None,
-            }
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_run_query)
+            try:
+                future.result(timeout=QUERY_TIMEOUT_SECONDS)
+            except FuturesTimeoutError:
+                return {
+                    "success": False,
+                    "columns": [],
+                    "rows": [],
+                    "count": 0,
+                    "error": f"Query timed out after {QUERY_TIMEOUT_SECONDS} seconds",
+                }
 
-        except SQLAlchemyError as e:
-            # Map common errors to user-friendly messages
-            error_msg = str(e).split("\n")[0]
-
+        if result_holder["error"]:
+            error_msg = result_holder["error"]
             if "syntax error" in error_msg.lower():
                 return {
                     "success": False,
@@ -64,7 +67,6 @@ class QueryExecutor:
                     "count": 0,
                     "error": f"SQL syntax error: {error_msg}",
                 }
-
             return {
                 "success": False,
                 "columns": [],
@@ -73,8 +75,14 @@ class QueryExecutor:
                 "error": f"Query execution failed: {error_msg}",
             }
 
-        finally:
-            db.close()
+        data = result_holder["data"]
+        return {
+            "success": True,
+            "columns": data["columns"],
+            "rows": data["rows"],
+            "count": data["count"],
+            "error": None,
+        }
 
 
 executor = QueryExecutor()

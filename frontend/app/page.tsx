@@ -9,6 +9,9 @@ import NaturalLanguageInput from "@/components/NaturalLanguageInput";
 import GeneratedSQLPreview from "@/components/GeneratedSQLPreview";
 import QueryExplanation from "@/components/QueryExplanation";
 import WorkflowActions from "@/components/WorkflowActions";
+import SecurityBanner from "@/components/SecurityBanner";
+import RateLimitError from "@/components/RateLimitError";
+import QuerySafetyStatus from "@/components/QuerySafetyStatus";
 import { workflowPreview, workflowExecute } from "@/services/api";
 
 export type WorkflowState =
@@ -18,12 +21,21 @@ export type WorkflowState =
   | "editing"
   | "executing"
   | "success"
-  | "error";
+  | "error"
+  | "rate_limited";
 
 interface HistoryEntry {
   prompt: string;
   sql: string;
   timestamp: Date;
+}
+
+function classifyError(error: string | null): "error" | "rate_limited" | "rejected" | null {
+  if (!error) return null;
+  const lower = error.toLowerCase();
+  if (lower.includes("rate limit") || lower.includes("429")) return "rate_limited";
+  if (lower.includes("unsafe") || lower.includes("rejected") || lower.includes("injection")) return "rejected";
+  return "error";
 }
 
 export default function Home() {
@@ -44,6 +56,12 @@ export default function Home() {
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
 
+  const errorType = classifyError(workflowError || queryError);
+  const bannerState = errorType === "rate_limited" ? "rate_limited"
+    : errorType === "rejected" ? "rejected"
+    : workflowState === "error" ? "error"
+    : workflowState;
+
   async function handlePreview(p: string) {
     setPrompt(p);
     setWorkflowState("generating");
@@ -52,7 +70,8 @@ export default function Home() {
     const result = await workflowPreview(p);
 
     if (!result.success) {
-      setWorkflowState("error");
+      const isRateLimit = (result.error || "").toLowerCase().includes("rate limit");
+      setWorkflowState(isRateLimit ? "rate_limited" : "error");
       setWorkflowError(result.error || "Failed to generate SQL");
       setGeneratedSql("");
       setExplanation("");
@@ -83,7 +102,8 @@ export default function Home() {
     const result = await workflowExecute(sql);
 
     if (!result.success) {
-      setWorkflowState("error");
+      const isRateLimit = (result.error || "").toLowerCase().includes("rate limit");
+      setWorkflowState(isRateLimit ? "rate_limited" : "error");
       setQueryError(result.error || "Query execution failed");
       setColumns([]);
       setRows([]);
@@ -156,17 +176,23 @@ export default function Home() {
                   isLoading={workflowState === "generating"}
                 />
 
+                {errorType === "rate_limited" && (
+                  <RateLimitError message={workflowError || queryError || undefined} />
+                )}
+
                 {(workflowState === "generating" ||
                   workflowState === "previewing" ||
                   workflowState === "editing" ||
                   workflowState === "executing" ||
-                  workflowState === "error") && (
+                  workflowState === "error" ||
+                  workflowState === "success" ||
+                  workflowState === "rate_limited") && (
                   <>
                     <GeneratedSQLPreview
                       sql={generatedSql}
                       prompt={prompt}
                       explanation={explanation}
-                      error={workflowError}
+                      error={workflowState === "error" || workflowState === "rate_limited" ? workflowError : null}
                       isLoading={workflowState === "generating"}
                     />
 
@@ -208,26 +234,32 @@ export default function Home() {
                   </>
                 )}
 
-                {queryError && (
+                {errorType === "rejected" && (
+                  <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-sm text-red-700 dark:text-red-400">
+                    <span className="font-semibold">Unsafe Prompt Rejected:</span> {workflowError}
+                  </div>
+                )}
+
+                {errorType === "error" && !errorType && (
                   <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-sm text-red-700 dark:text-red-400">
                     <span className="font-semibold">Error:</span> {queryError}
                   </div>
                 )}
 
+                <SecurityBanner status={bannerState} />
+
                 <ResultsTable
                   columns={columns}
                   rows={rows}
                   rowCount={rowCount}
-                  error={workflowState === "error" && !queryError ? workflowError : null}
+                  error={workflowState === "error" && !queryError && !errorType ? workflowError : null}
                   isLoading={workflowState === "executing"}
                 />
 
                 {history.length > 0 && (
                   <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden">
                     <div className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-5 py-3">
-                      <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                        Recent Queries
-                      </p>
+                      <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Recent Queries</p>
                     </div>
                     <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
                       {history.map((entry, i) => (
@@ -256,6 +288,16 @@ export default function Home() {
             )}
 
             {activeView === "Schema Explorer" && <SchemaExplorer />}
+
+            {activeView === "Settings" && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Settings</h2>
+                  <p className="text-sm text-zinc-500">Application configuration and security information</p>
+                </div>
+                <QuerySafetyStatus />
+              </div>
+            )}
           </div>
         </main>
       </div>

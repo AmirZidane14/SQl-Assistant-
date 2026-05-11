@@ -1,8 +1,6 @@
-import json
-import urllib.request
-import urllib.error
 from api.schema_routes import _load_schema
 from services.schema_formatter import format_schema_as_text
+from services.prompt_guard import detect_injection as guard_detect_injection
 
 
 SYSTEM_INSTRUCTIONS = """You are a SQL expert assistant. Your task is to convert natural language questions into valid SQLite SQL queries.
@@ -21,10 +19,6 @@ SCHEMA:"""
 
 
 def build_prompt(user_prompt: str) -> str:
-    """
-    Assemble the full prompt sent to the LLM.
-    Includes system instructions, cached schema, and the user's question.
-    """
     tables = _load_schema()
     schema_text = format_schema_as_text(tables)
 
@@ -40,37 +34,5 @@ SQL QUERY:"""
     return full_prompt
 
 
-INJECTION_PATTERNS = [
-    "ignore previous instructions",
-    "ignore all previous",
-    "disregard your instructions",
-    "new instructions:",
-    "system prompt",
-    "reveal your",
-    "return api key",
-    "show your prompt",
-    "pretend you are",
-    "drop all tables",
-    "truncate database",
-    "delete everything",
-    "insert into",
-    "update ",
-    "alter table",
-    "create table",
-    "drop database",
-    "<script",
-    "sudo ",
-    "rm -rf",
-]
-
-
 def detect_injection(prompt: str) -> tuple[bool, str | None]:
-    """
-    Check user prompt for prompt injection attempts.
-    Returns (is_injection, error_message).
-    """
-    lowered = prompt.lower().strip()
-    for pattern in INJECTION_PATTERNS:
-        if pattern in lowered:
-            return True, "Prompt contains potentially unsafe content and was rejected"
-    return False, None
+    return guard_detect_injection(prompt)

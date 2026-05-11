@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from database.connection import get_db, init_db, get_table_names
 from database.seed_data import seed_database
+from api.query_routes import router as query_router
 
 app = FastAPI(
     title="AI SQL Query Assistant — Backend",
@@ -14,11 +15,13 @@ app = FastAPI(
 # Allow the Next.js frontend running on port 3000 to call these APIs
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(query_router)
 
 
 @app.on_event("startup")

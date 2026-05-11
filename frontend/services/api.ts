@@ -18,10 +18,29 @@ export interface ExecuteQueryResponse {
   error: string | null;
 }
 
+export interface WorkflowPreviewResponse {
+  success: boolean;
+  user_prompt: string;
+  generated_sql: string;
+  explanation: string;
+  valid: boolean;
+  error: string | null;
+}
+
+export interface WorkflowExecuteResponse {
+  success: boolean;
+  columns: string[];
+  rows: unknown[][];
+  count: number;
+  error: string | null;
+}
+
 export interface GenerateSQLResponse {
   success: boolean;
   user_prompt: string;
   generated_sql: string;
+  explanation?: string;
+  valid?: boolean;
   error: string | null;
 }
 
@@ -95,9 +114,9 @@ export async function executeQuery(sql: string): Promise<ExecuteQueryResponse> {
   }
 }
 
-export async function generateSQL(prompt: string): Promise<GenerateSQLResponse> {
+export async function workflowPreview(prompt: string): Promise<WorkflowPreviewResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/ai/generate`, {
+    const response = await fetch(`${API_BASE_URL}/api/workflow/preview`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt }),
@@ -108,18 +127,57 @@ export async function generateSQL(prompt: string): Promise<GenerateSQLResponse> 
         success: false,
         user_prompt: prompt,
         generated_sql: "",
+        explanation: "",
+        valid: false,
         error: "Unable to connect to backend",
       };
     }
 
-    const data: GenerateSQLResponse = await response.json();
+    const data: WorkflowPreviewResponse = await response.json();
     return data;
   } catch {
     return {
       success: false,
       user_prompt: prompt,
       generated_sql: "",
+      explanation: "",
+      valid: false,
       error: "Unable to connect to backend",
     };
   }
+}
+
+export async function workflowExecute(sql: string): Promise<WorkflowExecuteResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/workflow/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: sql }),
+    });
+
+    if (!response.ok) {
+      return {
+        success: false,
+        columns: [],
+        rows: [],
+        count: 0,
+        error: "Unable to connect to backend",
+      };
+    }
+
+    const data: WorkflowExecuteResponse = await response.json();
+    return data;
+  } catch {
+    return {
+      success: false,
+      columns: [],
+      rows: [],
+      count: 0,
+      error: "Unable to connect to backend",
+    };
+  }
+}
+
+export async function generateSQL(prompt: string): Promise<GenerateSQLResponse> {
+  return workflowPreview(prompt);
 }

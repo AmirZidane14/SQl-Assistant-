@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, KeyboardEvent } from "react";
-import { generateSQL } from "@/services/api";
 
 interface NaturalLanguageInputProps {
-  onGenerated: (sql: string, prompt: string) => void;
-  onError: (error: string) => void;
+  onPreview: (prompt: string) => Promise<void>;
+  isLoading: boolean;
 }
 
 const EXAMPLE_PROMPTS = [
@@ -14,30 +13,16 @@ const EXAMPLE_PROMPTS = [
   "Find orders placed in the last 30 days",
 ];
 
-export default function NaturalLanguageInput({ onGenerated, onError }: NaturalLanguageInputProps) {
+export default function NaturalLanguageInput({ onPreview, isLoading }: NaturalLanguageInputProps) {
   const [prompt, setPrompt] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
 
   async function handleGenerate() {
     if (!prompt.trim()) return;
-
-    setIsLoading(true);
-    onError("");
-
-    const result = await generateSQL(prompt);
-
-    setIsLoading(false);
-
-    if (!result.success) {
-      onError(result.error || "Failed to generate SQL");
-    } else {
-      onGenerated(result.generated_sql, result.user_prompt);
-    }
+    await onPreview(prompt.trim());
   }
 
   function handleClear() {
     setPrompt("");
-    onError("");
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -69,6 +54,7 @@ export default function NaturalLanguageInput({ onGenerated, onError }: NaturalLa
         placeholder="Ask your database in plain English... e.g. Show customers who spent more than 5000"
         className="w-full resize-none rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 p-4 text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-colors min-h-24"
         rows={3}
+        disabled={isLoading}
       />
 
       <div className="mt-3">
@@ -78,7 +64,8 @@ export default function NaturalLanguageInput({ onGenerated, onError }: NaturalLa
             <button
               key={example}
               onClick={() => insertExample(example)}
-              className="rounded-full border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1 text-xs text-zinc-600 dark:text-zinc-400 hover:border-indigo-300 hover:text-indigo-600 dark:hover:border-indigo-700 dark:hover:text-indigo-400 transition-colors"
+              disabled={isLoading}
+              className="rounded-full border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1 text-xs text-zinc-600 dark:text-zinc-400 hover:border-indigo-300 hover:text-indigo-600 dark:hover:border-indigo-700 dark:hover:text-indigo-400 disabled:opacity-50 transition-colors"
             >
               {example}
             </button>
@@ -98,21 +85,22 @@ export default function NaturalLanguageInput({ onGenerated, onError }: NaturalLa
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              Generating SQL...
+              Generating...
             </>
           ) : (
             <>
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              Generate SQL
+              Generate Query
             </>
           )}
         </button>
 
         <button
           onClick={handleClear}
-          className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+          disabled={isLoading}
+          className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-50 transition-colors"
         >
           Clear
         </button>

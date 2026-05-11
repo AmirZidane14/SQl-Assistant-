@@ -7,6 +7,7 @@ from database.seed_data import seed_database
 from api.query_routes import router as query_router
 from api.schema_routes import router as schema_router
 from api.schema_routes import _load_schema
+from api.ai_routes import router as ai_router
 
 app = FastAPI(
     title="AI SQL Query Assistant — Backend",
@@ -25,6 +26,7 @@ app.add_middleware(
 
 app.include_router(query_router)
 app.include_router(schema_router)
+app.include_router(ai_router)
 
 
 @app.on_event("startup")

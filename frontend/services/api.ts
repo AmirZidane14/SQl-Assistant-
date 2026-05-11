@@ -18,6 +18,13 @@ export interface ExecuteQueryResponse {
   error: string | null;
 }
 
+export interface GenerateSQLResponse {
+  success: boolean;
+  user_prompt: string;
+  generated_sql: string;
+  error: string | null;
+}
+
 export async function checkBackendHealth(): Promise<HealthResponse | null> {
   try {
     const response = await fetch(`${API_BASE_URL}/health`, {
@@ -83,6 +90,35 @@ export async function executeQuery(sql: string): Promise<ExecuteQueryResponse> {
       columns: [],
       rows: [],
       count: 0,
+      error: "Unable to connect to backend",
+    };
+  }
+}
+
+export async function generateSQL(prompt: string): Promise<GenerateSQLResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/ai/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+    });
+
+    if (!response.ok) {
+      return {
+        success: false,
+        user_prompt: prompt,
+        generated_sql: "",
+        error: "Unable to connect to backend",
+      };
+    }
+
+    const data: GenerateSQLResponse = await response.json();
+    return data;
+  } catch {
+    return {
+      success: false,
+      user_prompt: prompt,
+      generated_sql: "",
       error: "Unable to connect to backend",
     };
   }

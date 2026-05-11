@@ -12,9 +12,11 @@ const NAV_ITEMS = [
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
+  activeView: string;
+  onViewChange: (view: string) => void;
 }
 
-export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
+export default function Sidebar({ collapsed, onToggle, activeView, onViewChange }: SidebarProps) {
   const [activeItem, setActiveItem] = useState("Query Console");
 
   return (
@@ -50,7 +52,10 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {NAV_ITEMS.map((item) => (
           <button
             key={item.label}
-            onClick={() => setActiveItem(item.label)}
+            onClick={() => {
+              setActiveItem(item.label);
+              onViewChange(item.label);
+            }}
             className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
               activeItem === item.label
                 ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"

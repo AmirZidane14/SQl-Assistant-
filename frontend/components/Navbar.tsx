@@ -2,15 +2,28 @@
 
 import StatusBadge from "./StatusBadge";
 
-export default function Navbar() {
+interface NavbarProps {
+  activeView?: string;
+}
+
+const VIEW_TITLES: Record<string, { title: string; subtitle: string }> = {
+  "Query Console": { title: "Query Console", subtitle: "Write SQL queries and view results" },
+  "Schema Explorer": { title: "Schema Explorer", subtitle: "Browse database structure and relationships" },
+  "Query History": { title: "Query History", subtitle: "View and re-run past queries" },
+  "Settings": { title: "Settings", subtitle: "Configure your assistant" },
+};
+
+export default function Navbar({ activeView = "Query Console" }: NavbarProps) {
+  const info = VIEW_TITLES[activeView] || VIEW_TITLES["Query Console"];
+
   return (
     <header className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-6 py-3">
       <div>
         <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-          Query Console
+          {info.title}
         </h1>
         <p className="text-xs text-zinc-400">
-          Ask questions in plain English, get SQL
+          {info.subtitle}
         </p>
       </div>
 

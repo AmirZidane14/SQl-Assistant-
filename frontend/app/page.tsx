@@ -5,10 +5,12 @@ import Sidebar from "@/components/Sidebar";
 import Navbar from "@/components/Navbar";
 import QueryEditor from "@/components/QueryEditor";
 import ResultsTable from "@/components/ResultsTable";
+import SchemaExplorer from "@/components/SchemaExplorer";
 import { ExecutionStatus } from "@/types/query";
 
 export default function Home() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [activeView, setActiveView] = useState<string>("Query Console");
   const [query, setQuery] = useState("");
   const [columns, setColumns] = useState<string[]>([]);
   const [rows, setRows] = useState<unknown[][]>([]);
@@ -21,44 +23,52 @@ export default function Home() {
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        activeView={activeView}
+        onViewChange={setActiveView}
       />
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        <Navbar />
+        <Navbar activeView={activeView} />
 
         <main className="flex-1 overflow-y-auto p-6">
           <div className="mx-auto max-w-5xl space-y-6">
-            <QueryEditor
-              query={query}
-              onQueryChange={setQuery}
-              onResults={(cols, r, count) => {
-                setColumns(cols);
-                setRows(r);
-                setRowCount(count);
-                setError(null);
-              }}
-              onError={(err) => {
-                setError(err);
-                setColumns([]);
-                setRows([]);
-                setRowCount(0);
-              }}
-              onStatusChange={setStatus}
-            />
+            {activeView === "Query Console" && (
+              <>
+                <QueryEditor
+                  query={query}
+                  onQueryChange={setQuery}
+                  onResults={(cols, r, count) => {
+                    setColumns(cols);
+                    setRows(r);
+                    setRowCount(count);
+                    setError(null);
+                  }}
+                  onError={(err) => {
+                    setError(err);
+                    setColumns([]);
+                    setRows([]);
+                    setRowCount(0);
+                  }}
+                  onStatusChange={setStatus}
+                />
 
-            {error && status === "error" && (
-              <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-sm text-red-700 dark:text-red-400">
-                <span className="font-semibold">Error:</span> {error}
-              </div>
+                {error && status === "error" && (
+                  <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 px-4 py-3 text-sm text-red-700 dark:text-red-400">
+                    <span className="font-semibold">Error:</span> {error}
+                  </div>
+                )}
+
+                <ResultsTable
+                  columns={columns}
+                  rows={rows}
+                  rowCount={rowCount}
+                  error={error}
+                  isLoading={status === "loading"}
+                />
+              </>
             )}
 
-            <ResultsTable
-              columns={columns}
-              rows={rows}
-              rowCount={rowCount}
-              error={error}
-              isLoading={status === "loading"}
-            />
+            {activeView === "Schema Explorer" && <SchemaExplorer />}
           </div>
         </main>
       </div>

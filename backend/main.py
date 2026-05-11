@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from database.connection import get_db, init_db, get_table_names
 from database.seed_data import seed_database
 from api.query_routes import router as query_router
+from api.schema_routes import router as schema_router
+from api.schema_routes import _load_schema
 
 app = FastAPI(
     title="AI SQL Query Assistant — Backend",
@@ -22,6 +24,7 @@ app.add_middleware(
 )
 
 app.include_router(query_router)
+app.include_router(schema_router)
 
 
 @app.on_event("startup")
@@ -41,6 +44,9 @@ def on_startup():
         seed_database()
     else:
         print("[startup] Database already seeded — skipping.")
+    print("[startup] Loading schema cache...")
+    _load_schema()
+    print("[startup] Schema cache ready.")
 
 
 @app.get("/health")
